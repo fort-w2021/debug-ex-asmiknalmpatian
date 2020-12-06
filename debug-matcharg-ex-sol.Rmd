@@ -1,0 +1,58 @@
+## *match*? ARRRGH!
+
+In dieser Aufgabe geht es darum fremden, einigermaßen komplexen Code zu lesen und zu verstehen.
+
+Schauen Sie sich die Hilfe und den Quellcode für `match.arg()` an und kopieren Sie den Quellcode in ihre Lösung.  
+Kommentierten Quellcode für `match.arg()` und andere `base`-Funktionen finden Sie [hier](https://github.com/wch/r-source/blob/ce1ceeddd6ff6a22a76d68a83fc15a50e220e204/src/library/base/R/match.R#L41).
+
+Benutzen Sie den interaktiven Debugger via
+```{r, match_arg_dbg, eval = FALSE}
+make_something <- function(something = c("mess", "cake", "hyuuge mistake")) {
+  something <- match.arg(something)
+  message("I made a", something, ".\n")
+}
+debugonce(match.arg)
+make_something()
+```
+um Zeile für Zeile durch `match.arg()` zu gehen. Finden Sie heraus was vor sich geht. Dafür müssen Sie wahrscheinlich `make_something()` auch mal mit anderen Argumenten aufrufen. Schreiben Sie für jede (nicht völlig triviale)  Zeile in `match.arg()` einen Kommentar in ihre Kopie des `match.arg()`-Codes der erklärt wie & warum was passiert.
+
+*Hinweis:* Benutzen Sie hier `debugonce()`, nicht `debug()`, vor allem wenn Sie eine andere Beispielfunktion als die obige benutzen -- sehr viele Funktionen rufen intern `match.arg()` auf und wir wollen nicht dass der Debugger bei jedem Aufruf von `match.arg()` aus einer Unterfunktion heraus in diesen neuen Aufruf springt...  
+
+```{r, match_arg_sol, eval = FALSE}
+match.arg <- function (arg, choices, several.ok = FALSE)
+{
+  if (missing(choices)) {
+    # if the argument choices is missing with the possible 
+    # argument values, then get them from the superior function
+    formal.args <- formals(sys.function(sysP <- sys.parent()))
+    choices <- eval(formal.args[[as.character(substitute(arg))]],
+                    envir = sys.frame(sysP))
+  }
+  # if no arg given, return first element of choices-vector
+  if (is.null(arg)) return(choices[1L])
+  else if(!is.character(arg))
+    # Stop and Return error if the argument is not character (inputcheck)
+    stop("'arg' must be NULL or a character vector")
+  if (!several.ok) { # most important (default) case:
+    ## the arg can be the whole of choices as a default argument.
+    if(identical(arg, choices)) return(arg[1L])
+    # stop and return error if arg has more than one element, but not all possible choices 
+    if(length(arg) > 1L) stop("'arg' must be of length 1")
+    # stop and return error if arg has no elements
+  } else if(length(arg) == 0L) stop("'arg' must be of length >= 1")
+  
+  ## handle each element of arg separately
+  # matches for the elements of arg among those of choices -> returns indices
+  i <- pmatch(arg, choices, nomatch = 0L, duplicates.ok = TRUE)
+  if (all(i == 0L))
+    # returns error if no matches achieved
+    stop(gettextf("'arg' should be one of %s",
+                  paste(dQuote(choices), collapse = ", ")),
+         domain = NA)
+  i <- i[i > 0L]
+  # Return error if there are several matches for the elements of arg
+  if (!several.ok && length(i) > 1)
+    stop("there is more than one match in 'match.arg'")
+  choices[i]
+}
+```
